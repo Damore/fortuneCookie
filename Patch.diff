@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.java b/src/main/java/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.java
+index c1d2517..91dfe0d 100644
+--- a/src/main/java/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.java
++++ b/src/main/java/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.java
+@@ -1,5 +1,6 @@
+ package com.monsanto.interview.FortuneCookieGenerator;
+ 
++import org.springframework.beans.factory.ObjectFactory;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.GetMapping;
+@@ -12,16 +13,26 @@
+ 	@Autowired
+ 	private QuoteRepository quoteRepository;
+ 
++	// The blocker issue was caused by injecting a prototype bean into a singleton instance.
+ 	@Autowired
+-	private FortuneCookieBuilder fortuneCookieBuilder;
++	private ObjectFactory<FortuneCookieBuilder> fortuneCookieBuilderFactory;
+ 
+ 	@GetMapping(path = "/generateFortuneCookie", produces = { "application/json" })
+ 	public @ResponseBody FortuneCookie generateFortuneCookie(@RequestParam("client") String client,
+ 			@RequestParam("company") String company) {
+ 		String quote = quoteRepository.getRandomQuote();
+-		FortuneCookie fortuneCookie = fortuneCookieBuilder.withClient(client).withCompany(company).withQuote(quote)
++		FortuneCookie fortuneCookie = getPrototypeInstance().withClient(client).withCompany(company).withQuote(quote)
+ 				.build();
+ 		return fortuneCookie;
+ 	}
++	
++	/**
++	 * Now, for each request, a new fortuneCookieBuilder is created.
++	 * 
++	 * @return the forturneCookieBuilder
++	 */
++	public FortuneCookieBuilder getPrototypeInstance() {
++		return fortuneCookieBuilderFactory.getObject();
++	}
+ 
+ }
+diff --git a/src/main/test/com/monsanto/interview/test/FortuneCookieTest.java b/src/main/test/com/monsanto/interview/test/FortuneCookieTest.java
+new file mode 100644
+index 0000000..e06c7b4
+--- /dev/null
++++ b/src/main/test/com/monsanto/interview/test/FortuneCookieTest.java
+@@ -0,0 +1,28 @@
++package com.monsanto.interview.test;
++
++import static org.junit.Assert.assertTrue;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.springframework.context.annotation.AnnotationConfigApplicationContext;
++import org.springframework.context.support.AbstractApplicationContext;
++import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
++
++import com.monsanto.interview.FortuneCookieGenerator.FortuneCookieBuilder;
++import com.monsanto.interview.FortuneCookieGenerator.FortuneCookieController;
++import com.monsanto.interview.FortuneCookieGenerator.FortuneCookieGeneratorApplication;
++
++@RunWith(SpringJUnit4ClassRunner.class)
++public class FortuneCookieTest {
++	
++	@Test
++	public void test() {
++		AbstractApplicationContext context = new AnnotationConfigApplicationContext(FortuneCookieGeneratorApplication.class);
++		FortuneCookieController singletonBean = context.getBean(FortuneCookieController.class);
++		FortuneCookieBuilder firstInstance = singletonBean.getPrototypeInstance();
++		FortuneCookieBuilder secondInstance = singletonBean.getPrototypeInstance();
++		assertTrue(firstInstance != secondInstance);
++		context.close();
++	}
++
++}
+diff --git a/target/classes/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.class b/target/classes/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.class
+index f9c5711..85e48a3 100644
+--- a/target/classes/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.class
++++ b/target/classes/com/monsanto/interview/FortuneCookieGenerator/FortuneCookieController.class
+Binary files differ
+diff --git a/target/classes/com/monsanto/interview/test/FortuneCookieTest.class b/target/classes/com/monsanto/interview/test/FortuneCookieTest.class
+new file mode 100644
+index 0000000..485c7f7
+--- /dev/null
++++ b/target/classes/com/monsanto/interview/test/FortuneCookieTest.class
+Binary files differ
